@@ -1,43 +1,43 @@
-name: Node.js CI
+name: Node.js CI/CD
 
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
   pull_request:
-    branches: '*'
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  quality:
+  build-and-test:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        node-version: [10.x, 12.x, 14.x, 15.x]
-        os: [ubuntu-latest, windows-latest]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-
+        node-version: ['14.x', '16.x', '18.x']
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
     - uses: actions/checkout@v2
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v2
+    - uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
-    - run: echo "Using Node.js ${{ matrix.node-version }} on ${{ matrix.os }}"
+        cache: 'npm'
     - run: npm ci
-    - run: npm test
+    - run: npm run lint
+    - run: npm run test -- --coverage
+    - run: npx audit-ci --moderate
 
   publish:
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/main' }}
-    needs: [quality]
+    needs: build-and-test
     steps:
     - uses: actions/checkout@v2
-    - name: Use Node.js ${{ matrix.node-version }}  # This will not work as intended since matrix is not defined in the 'publish' job.
-      uses: actions/setup-node@v2
+    - uses: actions/setup-node@v3
       with:
-        node-version: '14.x'  # Set a default or specific version since 'matrix' is not applicable here.
-    - run: echo "Using Node.js 14.x on ubuntu-latest"
+        node-version: '16.x'
+        cache: 'npm'
     - run: npm ci
-    - run: npm run semantic-release
+    - run: npm publish
       env:
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
