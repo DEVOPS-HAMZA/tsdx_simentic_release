@@ -1,6 +1,3 @@
-# This workflow will do a clean install of node dependencies, build the source code and run tests across different versions of node
-# For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
-
 name: Node.js CI
 
 on:
@@ -11,9 +8,7 @@ on:
 
 jobs:
   quality:
-
     runs-on: ${{ matrix.os }}
-
     strategy:
       matrix:
         node-version: [10.x, 12.x, 14.x, 15.x]
@@ -26,21 +21,23 @@ jobs:
       uses: actions/setup-node@v2
       with:
         node-version: ${{ matrix.node-version }}
+    - run: echo "Using Node.js ${{ matrix.node-version }} on ${{ matrix.os }}"
     - run: npm ci
     - run: npm test
-  
+
   publish:
     runs-on: ubuntu-latest
     if: ${{ github.ref == 'refs/heads/main' }}
     needs: [quality]
-    steps: 
+    steps:
     - uses: actions/checkout@v2
-    - name: Use Node.js ${{ matrix.node-version }}
+    - name: Use Node.js ${{ matrix.node-version }}  # This will not work as intended since matrix is not defined in the 'publish' job.
       uses: actions/setup-node@v2
       with:
-        node-version: ${{ matrix.node-version }}
+        node-version: '14.x'  # Set a default or specific version since 'matrix' is not applicable here.
+    - run: echo "Using Node.js 14.x on ubuntu-latest"
     - run: npm ci
     - run: npm run semantic-release
-      env: 
+      env:
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
