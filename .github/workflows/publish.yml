@@ -1,43 +1,52 @@
-name: Node.js CI/CD
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
-    paths-ignore:
-      - '**.md'
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+    branches:
+      - develop
+      - main
+      - feature/* # Add the 'make' branch to the list of branches that trigger the workflow
+  workflow_dispatch:  # Allows manual trigger
 
 jobs:
   build-and-test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        node-version: ['14.x', '16.x', '18.x']
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    - run: npm ci
-    - run: npm run lint
-    - run: npm run test -- --coverage
-    - run: npx audit-ci --moderate
-
-  publish:
     runs-on: ubuntu-latest
-    needs: build-and-test
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-node@v3
-      with:
-        node-version: '16.x'
-        cache: 'npm'
-    - run: npm ci
-    - run: npm publish
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16'  # Ensure this matches the version you need
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test
+      - name: Build
+        run: npm run build
+    # Optionally, skip deployment steps if branch is 'make'
+    if: github.ref != 'refs/heads/make'
+
+  deploy:
+    needs: build-and-test
+    if: (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') && github.ref != 'refs/heads/feature/*'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+      
+      - name: Deploy to Development
+        if: github.ref == 'refs/heads/develop'
+        run: echo "Deploying to development environment..."
+        # Replace echo with your actual deployment command/script
+      
+      - name: Deploy to Staging
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: echo "Deploying to staging environment..."
+        # Replace echo with your actual deployment command/script
+
+      - name: Manual trigger for Production deployment
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+        run: echo "Deploying to production environment..."
+        # Replace echo with your actual deployment command/script
